@@ -1,6 +1,7 @@
 const Itinerary = require("../models/Itinerary");
 const client = require("../config/redis");
 const { v4: uuidv4 } = require("uuid");
+const mongoose = require("mongoose");
 
 // Create
 exports.createItinerary = async (req, res) => {
@@ -36,15 +37,32 @@ exports.getItinerary = async (req, res) => {
 
 // Update
 exports.updateItinerary = async (req, res) => {
-  const itinerary = await Itinerary.findByIdAndUpdate(req.params.id, req.body, { new: true });
-  if (!itinerary) return res.status(404).json({ message: "Not found" });
-  res.json(itinerary);
+    const allowedUpdates = ["title", "description", "startDate", "endDate", "locations", "destination"];
+    const updates = Object.keys(req.body);
+    const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
+    if (!isValidOperation) {
+        return res.status(400).json({ message: "Invalid fields in update" });
+    }
+    const itinerary = await Itinerary.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!itinerary) return res.status(404).json({ message: "Not found" });
+    res.json(itinerary);
 };
 
 // Delete
 exports.deleteItinerary = async (req, res) => {
-  await Itinerary.findByIdAndDelete(req.params.id);
-  res.json({ message: "Deleted" });
+    try {
+      const { id } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ message: "Invalid itinerary ID" });
+      }
+  
+      const itinerary = await Itinerary.findByIdAndDelete(id);
+      if (!itinerary) return res.status(404).json({ message: "Itinerary not found" });
+  
+      res.json({ message: "Deleted" });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
 };
 
 // Shareable Link
